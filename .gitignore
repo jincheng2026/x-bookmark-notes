@@ -1,0 +1,6 @@
+.DS_Store
+dist/
+node_modules/
+# 本机的交接文件和写飞书文档时的草稿，不公开
+docs/
+draft_*_folder/

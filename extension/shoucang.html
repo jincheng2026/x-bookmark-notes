@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="same-origin">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>X 收藏</title>
+<style>
+:root{
+  --bg:#fff;--ink:#0f1419;--ink-2:#536471;--line:#eff3f4;--line-2:#cfd9de;
+  --hover:rgba(0,0,0,.03);--hover-nav:rgba(15,20,25,.1);--field:#eff3f4;--soft:#f7f9f9;
+  --blue:#1d9bf0;--blue-10:rgba(29,155,240,.1);
+  --green:#00ba7c;--green-10:rgba(0,186,124,.1);
+  --pink:#f91880;--pink-10:rgba(249,24,128,.1);
+  --red:#f4212e;--red-10:rgba(244,33,46,.1);
+  --menu-shadow:rgba(101,119,134,.2) 0 0 15px,rgba(101,119,134,.15) 0 0 3px 1px;
+  --tip:rgba(91,112,131,.8);
+  --font:TwitterChirp,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"PingFang SC","Hiragino Sans GB",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#000;--ink:#e7e9ea;--ink-2:#71767b;--line:#2f3336;--line-2:#536471;
+  --hover:rgba(255,255,255,.03);--hover-nav:rgba(231,233,234,.1);--field:#202327;--soft:#16181c;
+  --menu-shadow:rgba(255,255,255,.2) 0 0 15px,rgba(255,255,255,.15) 0 0 3px 1px;
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;overflow-y:scroll}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:20px;overflow-wrap:break-word;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+button:focus,a:focus{outline:none}
+button:focus-visible,a:focus-visible,input:focus-visible{box-shadow:0 0 0 2px rgba(29,155,240,.5)}
+.svg{display:block;flex:none}
+[data-tip]{position:relative}
+[data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);background:var(--tip);color:#fff;font-size:11px;line-height:12px;padding:2px 4px;border-radius:2px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:40;font-weight:400}
+[data-tip]:hover::after{opacity:1;transition-delay:.5s}
+/* 提示字长的换行，不伸出屏幕把整页撑宽；卡片右边那排按钮的提示往左靠 */
+[data-tip]::after{width:max-content;max-width:240px;white-space:normal;text-align:center}
+.acts .end [data-tip]::after,.meta .more [data-tip]::after{left:auto;right:0;transform:none}
+
+/* 三栏：左 275 + 中 600（含左右边线）+ 右 350，右栏左右各留 30 / 8，合计 1265，和 X 一样居中 */
+.app{display:flex;justify-content:center;min-height:100vh}
+.left{width:275px;flex:none}
+.left-in{position:fixed;top:0;height:100vh;width:275px;padding:0 8px;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none}
+.logo{width:52px;height:52px;border-radius:9999px;display:grid;place-items:center;margin:2px 0;transition:background-color .2s}
+.logo:hover{background:var(--hover-nav)}
+.nav{display:flex;flex-direction:column;align-items:flex-start;margin:2px 0 4px}
+.nav-i{display:flex;align-items:center;padding:12px;margin:4px 0;border-radius:9999px;transition:background-color .2s;max-width:100%;color:var(--ink)}
+.nav-i:hover{background:var(--hover-nav)}
+.nav-i .ico{position:relative;display:block}
+.nav-i .lbl{font-size:20px;line-height:24px;margin:0 16px 0 20px;white-space:nowrap}
+.nav-i.on .lbl{font-weight:700}
+.nav-i[data-tip]::after,.post[data-tip]::after,.logo[data-tip]::after{display:none}
+.badge{position:absolute;top:-5px;right:-7px;min-width:18px;height:18px;padding:0 4px;border-radius:9999px;background:var(--blue);color:#fff;font-size:11px;line-height:16px;font-weight:700;text-align:center;border:1px solid var(--bg)}
+.badge[hidden]{display:none}
+.nav-sep{align-self:stretch;height:1px;background:var(--line);margin:4px 12px}
+.post{margin:16px 0 4px;width:90%;min-height:52px;border-radius:9999px;background:var(--ink);color:var(--bg);font-size:17px;line-height:20px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:opacity .2s;box-shadow:rgba(0,0,0,.08) 0 8px 28px;flex:none}
+.post:hover{opacity:.9}
+/* 收藏页最上面的引导：AI 分类还没装好时一直显示，装好自动消失 */
+.guide{margin:12px 16px 4px;padding:16px 18px;border:1px solid var(--blue);border-radius:16px;background:var(--blue-10)}
+.guide h3{margin:0 0 6px;font-size:17px}
+.guide p{margin:0 0 8px;color:var(--ink);font-size:15px;line-height:1.55}
+.guide ol{margin:0 0 12px;padding-left:20px;font-size:15px;line-height:1.7}
+.guide .gbtns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.guide .gbtn{border-radius:9999px;background:var(--blue);color:#fff;font-weight:700;font-size:15px;padding:9px 18px}
+.guide .gbtn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line-2)}
+.guide .gsub{color:var(--ink-2);font-size:14px}
+.guide.flash{animation:gflash .9s ease 2}
+@keyframes gflash{50%{box-shadow:0 0 0 4px var(--blue)}}
+.guide.ok{border-color:var(--green);background:var(--green-10)}
+.post.diy{margin-top:8px;background:var(--bg);color:var(--ink);border:1px solid var(--line-2);box-shadow:none}
+.post.diy:hover{background:var(--hover-nav);opacity:1}
+.post .svg{display:none}
+.acct{margin:auto 0 12px;display:flex;align-items:center;gap:12px;padding:12px;border-radius:9999px;transition:background-color .2s;width:100%}
+.acct:hover{background:var(--hover-nav)}
+.acct .who{flex:1;min-width:0;line-height:20px}
+.acct b{display:block;font-size:15px}.acct span{color:var(--ink-2);font-size:15px}
+.center{width:600px;flex:none;border-left:1px solid var(--line);border-right:1px solid var(--line);min-height:100vh;padding-bottom:50vh;box-sizing:content-box;margin-left:-1px}
+.hdr{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+@media (prefers-color-scheme:dark){.hdr{background:rgba(0,0,0,.65)}}
+.hdr-top{display:flex;align-items:center;height:53px;padding:0 16px}
+.back{width:34px;height:34px;border-radius:9999px;display:grid;place-items:center;margin:0 20px 0 -8px;transition:background-color .2s;flex:none}
+.back:hover{background:var(--hover-nav)}
+.back[hidden]{display:none}
+.hdr-top h2{margin:0;font-size:20px;line-height:24px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;display:flex;align-items:center;gap:4px}
+.hdr-top h2 .svg{display:none}
+.hdr-top .sync{margin-right:4px;color:var(--ink)}
+.hdr-top .sync.spin .svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.filter{display:flex;align-items:center;gap:4px;height:34px;padding:0 12px;margin-right:-8px;border-radius:9999px;font-size:15px;font-weight:700;transition:background-color .2s;flex:none}
+.filter:hover{background:var(--hover-nav)}
+.filter.on{color:var(--blue)}
+.tabs{display:flex;overflow-x:auto;scrollbar-width:none}
+.tabs[hidden]{display:none}
+.tab{flex:1 0 auto;height:53px;display:flex;justify-content:center;font-size:15px;font-weight:500;color:var(--ink-2);transition:background-color .2s;padding:0 16px}
+.tabs.many .tab{padding:0 10px} /* 「可做成视频」有八个标签：两边留白收窄，电脑上一排放得下，最后的「不做了」不被挤出去 */
+.tab:hover{background:var(--hover-nav)}
+.tab span{position:relative;display:flex;align-items:center;height:100%;white-space:nowrap}
+.tab.on{color:var(--ink);font-weight:700}
+.tab.on span::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:100%;min-width:56px;height:4px;border-radius:9999px;background:var(--blue)}
+.m-search{display:none;padding:4px 16px 8px}
+.tw{display:flex;padding:12px 16px;border-bottom:1px solid var(--line);transition:background-color .2s;cursor:pointer}
+.tw:hover{background:var(--hover)}
+.tw-av{flex:none;margin-right:8px}
+.av{width:40px;height:40px;border-radius:9999px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:17px;flex:none;user-select:none;position:relative;overflow:hidden}
+.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--bg)}
+.tw-main{flex:1;min-width:0}
+.meta{display:flex;align-items:center;white-space:nowrap;min-height:20px}
+.meta .nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
+.meta .nm:hover{text-decoration:underline}
+.meta .hd,.meta .sep,.meta .tm,.meta .sv{color:var(--ink-2)}
+.meta .hd{margin-left:4px;overflow:hidden;text-overflow:ellipsis;flex-shrink:10}
+.meta .sep{padding:0 4px}
+.meta .tm:hover{text-decoration:underline}
+.meta .urg{color:var(--red);font-weight:700;margin-left:4px}
+.meta .fl{color:var(--ink-2);margin-left:4px}
+.meta .hotb{color:var(--pink);font-weight:700;margin-left:4px}
+/* 流量爆帖：只在「流量爆帖」这一栏里展开说明为什么算、现在还涨不涨 */
+.hotbox{display:none;margin-top:8px;padding:10px 12px;border-radius:12px;background:var(--pink-10);color:var(--ink)}
+#feed.hotview .hotbox{display:block}
+#feed.hotview .meta .hotb{display:none} /* 在流量爆帖这一栏里不用再标，省出位置给名字 */
+.hotbox .hl{display:flex;gap:6px;align-items:flex-start}
+.hotbox .hl + .hl{margin-top:4px}
+.hotbox .hl .svg{flex:none;margin-top:2px;color:var(--pink)}
+.hotbox .sub{color:var(--ink-2)}
+.hotnote{padding:12px 16px;border-bottom:1px solid var(--line);color:var(--ink-2);font-size:14px;line-height:20px}
+.hotnote b{color:var(--ink)}
+/* 收藏页有新版：开着的旧页面顶上提示刷新 */
+.newver{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--blue-10);color:var(--ink);font-size:14px;line-height:20px;display:flex;align-items:center;gap:12px}
+.newver[hidden]{display:none}
+.newver button{margin-left:auto;background:var(--ink);color:var(--bg);border-radius:9999px;padding:4px 14px;font-weight:700;font-size:13px}
+/* 手机从中转站打开、Mac 又睡着时，顶上说一声现在看到的是什么时候的数据 */
+.relaybar{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--blue-10);color:var(--ink-2);font-size:14px;line-height:20px}
+.relaybar b{color:var(--ink)}
+.meta .more{margin:-8px -8px -8px auto;padding-left:8px}
+.icbtn{width:34.75px;height:34.75px;border-radius:9999px;display:grid;place-items:center;color:var(--ink-2);transition:background-color .2s,color .2s}
+.icbtn:hover{background:var(--blue-10);color:var(--blue)}
+.ctx{color:var(--ink-2);display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:8px 0 4px}
+/* 写备注：卡片上最显眼的按钮（备注是分类准不准的根本，备注是一手判断） */
+.wnote{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px 0 13px;border-radius:9999px;background:var(--blue);color:#fff;font-size:15px;font-weight:700;line-height:20px;box-shadow:0 2px 8px rgba(29,155,240,.35);transition:background-color .2s,box-shadow .2s,transform .1s}
+.wnote:hover{background:#1a8cd8;box-shadow:0 3px 12px rgba(29,155,240,.45)}
+.wnote:active{transform:scale(.97)}
+.ai{color:var(--ink-2);margin-top:2px;display:flex;align-items:center;flex-wrap:wrap;column-gap:4px}
+.ai .svg{margin-right:2px}
+.ai .tg{color:var(--ink-2)}
+.ai .tg:hover{color:var(--blue);text-decoration:underline}
+.ai .vd{color:var(--ink)}
+.ai .dt{color:var(--blue)}
+.ai .dt:hover{text-decoration:underline}
+/* AI 分类那一行，按重要程度分三层：可做成什么（蓝色胶囊，最显眼）> 标签（加粗黑字，和正文一档）> 详情（灰字） */
+.tagline{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;margin-top:6px}
+.tagline .vd{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 11px 0 8px;border-radius:9999px;background:var(--blue-10);color:var(--blue);font-size:14px;line-height:16px;font-weight:700;white-space:nowrap;transition:background-color .2s}
+/* 多久内做：接在「可做成…」后面；一天内到期的红字，过了期的灰字；点这个标签就能改档 */
+.tagline button.vd:hover{background:rgba(29,155,240,.18)}
+.tagline .vd .due.soon{color:var(--red)}
+.tagline .vd .due.over{color:var(--ink-2)}
+.menu .mh{padding:12px 16px 4px;font-size:13px;line-height:16px;color:var(--ink-2)}
+.tagline .tgs{display:inline-flex;align-items:center;flex-wrap:wrap;column-gap:5px}
+.tagline .tg{font-weight:700;color:var(--ink)}
+.tagline .tg:hover{text-decoration:underline}
+.tagline .dot,.tagline .none{color:var(--ink-2)}
+.tagline .dt{color:var(--ink-2);font-size:14px}
+.tagline .dt:hover{color:var(--blue);text-decoration:underline}
+.ai-more{color:var(--ink-2);margin:4px 0 6px}
+.ai-more div{margin-top:2px}
+.ai-more .kw{color:var(--blue)}
+.ai-more .kw:hover{text-decoration:underline}
+.txt{white-space:pre-wrap;margin-top:2px}
+.txt a{word-break:break-all}
+.show-more{color:var(--blue)}
+.show-more:hover{text-decoration:underline}
+.media{display:grid;gap:2px;margin-top:12px;border:1px solid var(--line-2);border-radius:16px;overflow:hidden}
+.media .m{position:relative;overflow:hidden;background:var(--line);min-height:0}
+.media img{display:block;width:100%;height:100%;object-fit:cover;transition:filter .2s}
+.media .m:hover img{filter:brightness(.92)}
+.media.n1 img{height:auto;max-height:510px}
+/* 视频：和 X 一样，滑到哪条就静音自动播哪条；左下角剩余时长（动图写 GIF），右下角喇叭开关声音 */
+.media .m.vid{background:#000}
+.media .m.vid video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;opacity:0;transition:opacity .2s}
+.media .m.vid.on video{opacity:1}
+.media .m.vid.on .play{display:none}
+.media .m.vid:hover video{filter:brightness(.92)}
+.vtime{position:absolute;left:12px;bottom:12px;height:20px;padding:0 4px;border-radius:4px;background:rgba(0,0,0,.77);color:#fff;font-size:13px;line-height:20px;font-weight:500;font-variant-numeric:tabular-nums;pointer-events:none}
+.vmute{position:absolute;right:12px;bottom:12px;width:32px;height:32px;border-radius:9999px;background:rgba(0,0,0,.77);color:#fff;display:grid;place-items:center;transition:background-color .2s}
+.vmute:hover{background:rgba(0,0,0,.9)}
+.media.n2{grid-template-columns:1fr 1fr;aspect-ratio:16/9}
+.media.n3,.media.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;aspect-ratio:16/9}
+.media.n3 .m:first-child{grid-row:1 / 3}
+.play{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:9999px;background:var(--blue);border:4px solid #fff;display:grid;place-items:center;color:#fff}
+.card{margin-top:12px;border:1px solid var(--line-2);border-radius:16px;overflow:hidden;transition:background-color .2s}
+.card:hover{background:var(--hover)}
+.card[data-href]{cursor:pointer}
+.card-in{padding:12px}
+.qh{display:flex;align-items:center;white-space:nowrap;min-width:0}
+.qh .av{width:20px;height:20px;font-size:11px;margin-right:4px}
+.qh b{font-weight:700;overflow:hidden;text-overflow:ellipsis}
+.qh span{color:var(--ink-2);margin-left:4px;overflow:hidden;text-overflow:ellipsis}
+.qt{white-space:pre-wrap;margin-top:4px;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.card .kind{display:flex;align-items:center;gap:4px;color:var(--ink-2);font-size:13px;line-height:16px}
+.card .ttl{font-size:15px;font-weight:700;margin-top:2px}
+.card .sm{color:var(--ink-2);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.note .qt{-webkit-line-clamp:unset;display:block}
+.tw.editing,.tw.editing:hover{background:var(--hover-nav)}
+.side{position:fixed;z-index:45;width:350px;background:var(--bg);border:1px solid var(--line-2);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:12px 14px 10px;display:flex;flex-direction:column;font-size:14px;line-height:21px;animation:menu-in .12s ease-out}
+.side[hidden]{display:none}
+.side .head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.side .title{font-weight:700}
+.side .x{margin:-4px -6px -4px auto;width:28px;height:28px;border-radius:9999px;display:grid;place-items:center;color:var(--ink-2);transition:background-color .2s}
+.side .x:hover{background:var(--hover-nav)}
+.side .ref{font-size:12.5px;line-height:18px;color:var(--ink-2);background:var(--soft);border-radius:8px;padding:5px 8px;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.side .ref b{color:var(--ink);font-weight:600}
+/* 延期：写原因前先选延到多久（从现在算） */
+.side .opts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px;font-size:12.5px;line-height:18px;color:var(--ink-2)}
+.side .opts[hidden]{display:none}
+.side .opts button{padding:3px 10px;border:1px solid var(--line-2);border-radius:9999px;font-size:13px;line-height:18px;color:var(--ink);transition:background-color .2s,border-color .2s}
+.side .opts button:hover{background:var(--hover-nav)}
+.side .opts button.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+.side .opts .to{flex-basis:100%}
+.side textarea{display:block;width:100%;height:120px;resize:none;border:1px solid var(--line-2);border-radius:10px;padding:8px 10px;font:15px/1.55 var(--font);color:var(--ink);background:var(--bg);outline:0;transition:border-color .2s,box-shadow .2s}
+.side textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(29,155,240,.18)}
+.side .msg{font-size:12.5px;line-height:18px;margin-top:5px;color:#b54708}
+.side .msg:empty{display:none}
+.side .ft{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;line-height:16px;color:var(--ink-2)}
+.side .save{margin-left:auto;background:var(--ink);color:var(--bg);border-radius:9999px;padding:5px 14px;font-weight:700;font-size:13px;line-height:18px;transition:opacity .2s}
+.side .save:hover{opacity:.9}
+.pill{min-height:32px;padding:0 16px;border-radius:9999px;font-size:14px;font-weight:700;line-height:16px;transition:background-color .2s,opacity .2s}
+.pill.dark{background:var(--ink);color:var(--bg)}
+.pill.dark:hover{opacity:.9}
+.pill.line{border:1px solid var(--line-2)}
+.pill.line:hover{background:var(--hover-nav)}
+.verdict{color:var(--ink-2);margin-top:8px;display:flex;align-items:flex-start;gap:4px}
+.verdict > .svg{margin-top:3px} /* 原因写长了换行时，图标对齐第一行 */
+.verdict b{color:var(--ink);font-weight:700}
+.verdict.topic{margin-top:6px}
+.verdict.work .dt{margin-left:8px;color:var(--blue)}
+.acts{display:flex;align-items:center;justify-content:space-between;margin-top:12px;height:20px}
+.acts .grp{display:flex;flex:1;max-width:425px;justify-content:space-between;margin-right:24px}
+.acts .end{display:flex;gap:6px}
+.act{display:flex;align-items:center;color:var(--ink-2);font-size:13px;line-height:16px;min-width:0}
+.act .icbtn{margin:-8px 0 -8px -8px}
+.act .n{padding:0 12px 0 2px;white-space:nowrap}
+.act:hover{color:var(--blue)}.act:hover .icbtn{background:var(--blue-10);color:var(--blue)}
+.act.good:hover,.act.good.on,.act.good:hover .icbtn,.act.good.on .icbtn{color:var(--green)}.act.good:hover .icbtn{background:var(--green-10)}
+.act.bad:hover,.act.bad.on,.act.bad:hover .icbtn,.act.bad.on .icbtn{color:var(--pink)}.act.bad:hover .icbtn{background:var(--pink-10)}
+.act.st.on,.act.st.on .icbtn{color:var(--blue)}
+.act[disabled]{opacity:.4;pointer-events:none}
+.act.views{cursor:default}
+.pop{animation:pop .45s ease}
+@keyframes pop{0%{transform:scale(1)}30%{transform:scale(1.35)}60%{transform:scale(.9)}100%{transform:scale(1)}}
+/* 点了「准」、选了状态：和 X 点赞一样，图标先缩一下再弹大，外面一圈光环散开 */
+.act .icbtn{position:relative}
+.act.burst .svg{animation:tap .5s cubic-bezier(.2,.9,.3,1.4)}
+.act.burst .icbtn::after{content:"";position:absolute;inset:3px;border-radius:9999px;border:2px solid currentColor;opacity:0;animation:ring .55s ease-out;pointer-events:none}
+.act.burst .n{animation:fadein .3s ease}
+@keyframes tap{0%{transform:scale(1)}20%{transform:scale(.6)}55%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes ring{0%{transform:scale(.3);opacity:.9}100%{transform:scale(1.55);opacity:0}}
+@keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.empty{padding:32px;max-width:400px;margin:32px auto}
+.empty b{display:block;font-size:31px;line-height:36px;font-weight:800;margin-bottom:8px}
+.empty span{color:var(--ink-2)}
+.right{width:350px;flex:none;margin:0 8px 0 30px}
+.right-in{position:sticky;top:0;padding-bottom:64px}
+.srch-wrap{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 16px}
+.srch{display:flex;align-items:center;height:42px;border:1px solid var(--line-2);border-radius:9999px;background:var(--bg);transition:border-color .2s}
+.srch .svg{margin:0 0 0 16px;color:var(--ink-2)}
+.srch input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;font:inherit;color:var(--ink);padding:0 16px 0 12px}
+.srch input::placeholder{color:var(--ink-2)}
+.srch:focus-within{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+.srch:focus-within .svg{color:var(--blue)}
+.box{border:1px solid var(--line);border-radius:16px;margin-bottom:16px;overflow:hidden}
+.box h2{margin:0;padding:12px 16px;font-size:20px;line-height:24px;font-weight:800}
+.row{display:flex;align-items:center;gap:12px;padding:12px 16px;width:100%;transition:background-color .2s;text-align:left}
+.row:hover{background:var(--hover)}
+.row .t{flex:1;min-width:0}
+.row small{display:block;color:var(--ink-2);font-size:13px;line-height:16px}
+.row b{display:block;font-weight:700;font-size:15px;line-height:20px}
+.row .sub{color:var(--ink-2);font-size:15px}
+.row .ci{width:40px;height:40px;border-radius:9999px;background:var(--field);display:grid;place-items:center;color:var(--ink);flex:none}
+.row .pill{flex:none;min-width:78px}
+.row .pill.line:hover{border-color:#fdc9ce;color:var(--red);background:var(--red-10)}
+.row .pill.line .b{display:none}.row .pill.line:hover .a{display:none}.row .pill.line:hover .b{display:inline}
+.foot{padding:0 16px;font-size:13px;line-height:16px;color:var(--ink-2)}
+.foot span{margin-right:12px;display:inline-block}
+.searchnote{display:flex;align-items:center;gap:6px;padding:12px 16px;border-bottom:1px solid var(--line);color:var(--ink-2);font-size:14px}.searchnote .dt{margin-left:auto;color:var(--blue)}
+.menu.edit{max-height:min(560px,calc(100vh - 16px));overflow-y:auto} /* 改分类的菜单长，超出屏幕就在菜单里滚 */
+.menu.edit button{padding:9px 16px}
+.about{display:flex;gap:4px;align-items:flex-start;color:var(--ink-2);font-size:14px;line-height:20px;margin-top:6px}.about > .svg{margin-top:2px;flex:none}
+.note .qh .note-edit{margin-left:auto;color:var(--blue);font-size:13px}
+.menu{position:absolute;z-index:50;min-width:250px;max-width:360px;background:var(--bg);border-radius:12px;box-shadow:var(--menu-shadow);overflow:hidden;animation:menu-in .12s ease-out}
+@keyframes menu-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.menu button{display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;font-size:15px;font-weight:700;line-height:20px;transition:background-color .2s}
+.menu button:hover{background:var(--hover)}
+.menu button small{display:block;font-weight:400;color:var(--ink-2);font-size:13px;line-height:16px}
+.menu button.cur{color:var(--blue)}
+.menu .sep{height:1px;background:var(--line)}
+.menu .ind{padding-left:48px;font-weight:400}
+.toast{position:fixed;left:50%;bottom:32px;transform:translate(-50%,24px);opacity:0;background:var(--blue);color:#fff;padding:12px 16px;border-radius:4px;box-shadow:var(--menu-shadow);font-size:15px;line-height:20px;transition:transform .2s,opacity .2s;pointer-events:none;z-index:60;max-width:calc(100vw - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.bbar,.fab{display:none}
+/* 手机、窄屏上手指点不出悬停提示，干脆不放（放着也会把页面撑宽） */
+@media (max-width:700px),(hover:none){ [data-tip]::after{display:none !important} }
+@media (max-width:1264px){
+  .left,.left-in{width:88px}.left-in{align-items:center;padding:0 4px}
+  .nav{align-items:center}.nav-i .lbl,.nav-sep,.acct .who,.acct .dots{display:none}
+  .nav-i[data-tip]::after,.post[data-tip]::after,.logo[data-tip]::after{display:block}
+  .post{width:52px;min-height:52px}.post .t{display:none}.post .svg{display:block}
+  .acct{width:auto;padding:12px}
+}
+@media (max-width:1100px){.right{width:290px;margin:0 8px 0 16px}} /* 和 X 一样，窄一点的窗口右栏收窄，不把页面撑出横向滚动 */
+@media (max-width:1004px){.right{display:none}.m-search{display:block}}
+@media (max-width:700px){
+  .left{display:none}.center{width:100%;border:0;margin:0;padding-bottom:120px}
+  .hdr-top h2{cursor:pointer}.hdr-top h2 .svg{display:block}
+  .bbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;height:53px;background:var(--bg);border-top:1px solid var(--line);justify-content:space-around;align-items:center}
+  .bbar button{width:52px;height:52px;display:grid;place-items:center;position:relative}
+  .fab{display:grid;position:fixed;right:16px;bottom:72px;width:56px;height:56px;border-radius:9999px;background:var(--blue);color:#fff;place-items:center;z-index:21;box-shadow:rgba(101,119,134,.2) 0 0 10px,rgba(101,119,134,.25) 0 1px 3px 1px}
+  .acts .grp{margin-right:6px}
+  .tw{position:relative}
+  .meta{flex-wrap:wrap;white-space:normal;padding-right:30px;row-gap:0}
+  .meta .nm{max-width:60%}
+  .meta .more{position:absolute;top:6px;right:8px;margin:0;padding:0}
+  .act.go .n{display:none} /* 窄屏只留图标；「打开原帖」挤不下，在「更多」菜单里 */
+  .acts .end .go ~ a.act{display:none}
+  .acts .icbtn{width:32px;height:32px}
+  .act .n{font-size:13px}
+  .srch input,.side textarea{font-size:16px}
+  .tagline .vd{display:inline-block;height:auto;white-space:normal;line-height:18px;padding:4px 11px 4px 8px}
+  .tagline .vd > .svg{display:inline-block;vertical-align:-1px;margin-right:4px} /* 图标默认独占一行，这里要和字排在一行 */
+  .hdr-top .sync{margin-right:0}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="left"><div class="left-in">
+    <button class="logo" data-view="all" data-tip="全部收藏" aria-label="全部收藏" id="logo"></button>
+    <nav class="nav" id="nav"></nav>
+    <button class="post" id="judge" data-tip="开始分类"><span class="t">开始分类</span><span id="judgeIc"></span></button>
+    <button class="post diy" id="diy" data-tip="DIY：复制一段话发给你的 AI，按你的想法改这个页面"><span class="t">DIY</span><span id="diyIc"></span></button>
+    <div class="acct"><span id="meAv"></span><div class="who"><b>我的 X 收藏</b><span>X 收藏备注</span></div><span class="dots" id="acctDots"></span></div>
+  </div></header>
+  <main class="center">
+    <div class="hdr">
+      <div class="hdr-top"><button class="back" id="back" data-view="all" data-tip="返回" aria-label="返回" hidden></button><h2 id="title" data-act="views">全部收藏</h2><button class="sync icbtn" id="syncBtn" data-tip="从 X 同步最近的收藏" aria-label="从 X 同步"></button><button class="filter" id="filter" data-act="filter"></button></div>
+      <div class="m-search"><label class="srch"><span id="srchIc2"></span><input id="q2" placeholder="搜索" autocomplete="off"></label></div>
+      <div class="tabs" id="tabs" role="tablist" hidden></div>
+    </div>
+    <div class="newver" id="newVer" hidden><span>收藏页有新版了，刷新一下就能用上</span><button id="newVerBtn">刷新</button></div>
+    <div class="relaybar" id="relayBar" hidden></div>
+    <div class="guide" id="guide" hidden></div>
+    <div id="feed"></div>
+  </main>
+  <aside class="right"><div class="right-in">
+    <div class="srch-wrap"><label class="srch"><span id="srchIc"></span><input id="q" placeholder="搜索" autocomplete="off"></label></div>
+    <section class="box"><h2>可做成视频</h2><div id="videos"></div></section>
+    <section class="box"><h2>今天</h2><div id="today"></div></section>
+    <section class="box"><h2>关键词</h2><div id="kws"></div></section>
+    <div class="foot"><span id="scope"></span><span id="dataAt"></span><a href="help.html" id="oldLink" target="_blank" style="color:inherit">怎么让 AI 用这些收藏</a></div>
+  </div></aside>
+</div>
+<nav class="bbar" id="bbar"></nav>
+<button class="fab" id="fab" aria-label="开始分类"></button>
+<div class="side" id="side" role="dialog" aria-labelledby="sideTitle" hidden>
+  <div class="head"><span class="title" id="sideTitle"></span><button class="x" id="sideX" data-tip="收起，写了的字留着" aria-label="收起"></button></div>
+  <div class="ref" id="sideRef"></div>
+  <div class="opts" id="sideOpts" hidden></div>
+  <textarea id="sideText" maxlength="2000"></textarea>
+  <div class="msg" id="sideMsg"></div>
+  <div class="ft"><span>回车保存 · Shift+回车换行 · Esc 收起</span><button class="save" id="sideSave">保存</button></div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script src="install-prompt.js"></script>
+<script src="shoucang.js"></script>
+</body>
+</html>

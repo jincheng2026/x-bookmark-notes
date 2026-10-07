@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>设置 X 收藏备注</title>
+<style>
+  :root { --bg:#f7f9f9; --card:#fff; --ink:#0f1419; --ink-2:#536471; --line:#eff3f4; --line-2:#cfd9de; --blue:#1d9bf0; --green:#00ba7c; --red:#b42318; --red-bg:#fdecea; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#000; --card:#16181c; --ink:#e7e9ea; --ink-2:#71767b; --line:#2f3336; --line-2:#536471; --red:#ff8a80; --red-bg:#3a1414; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.65 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif; }
+  main { max-width: 620px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  .lead { color: var(--ink-2); margin: 0 0 28px; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; margin-bottom: 12px; display: flex; gap: 14px; }
+  .step.locked { opacity: .45; }
+  .num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; border: 2px solid var(--line-2); color: var(--ink-2); }
+  .step.active .num { border-color: var(--blue); color: var(--blue); }
+  .step.done .num { background: var(--green); border-color: var(--green); color: #fff; }
+  .body { flex: 1; min-width: 0; }
+  h2 { font-size: 17px; margin: 2px 0 4px; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--ink-2); font-size: 14px; }
+  .ok { color: var(--green); font-weight: 600; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn { border: 0; border-radius: 999px; padding: 9px 18px; font: 700 15px/1.2 inherit; font-family: inherit; cursor: pointer; background: var(--ink); color: var(--bg); }
+  .btn.blue { background: var(--blue); color: #fff; }
+  .btn.big { padding: 12px 26px; font-size: 16px; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+  .btn[disabled] { opacity: .45; cursor: default; }
+  .link { border: 0; background: none; color: var(--blue); cursor: pointer; padding: 0; font: inherit; }
+  .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 8px 0 6px; }
+  .bar i { display: block; height: 100%; width: 30%; background: var(--blue); border-radius: 3px; animation: slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
+  .err { background: var(--red-bg); color: var(--red); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; font-size: 14px; }
+  [hidden] { display: none !important; }
+  footer { margin-top: 24px; color: var(--ink-2); font-size: 13.5px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>欢迎用 X 收藏备注</h1>
+  <p class="lead">三步设置好。以后在 X 上点收藏，右下角会弹一个小框，写一句为什么存，回车就好。</p>
+
+  <section class="step" id="s1">
+    <div class="num">1</div>
+    <div class="body">
+      <h2>登录 X</h2>
+      <div id="s1Todo">
+        <p>插件借你这个 Chrome 里登录的 X 去取收藏，读不到也不保存你的密码。</p>
+        <div class="row"><button class="btn blue" id="login" type="button">去登录 X</button><span class="muted" id="loginWait" hidden>登录好了回到这里，会自动往下走</span></div>
+      </div>
+      <p class="ok" id="s1Done" hidden>已经登录 X</p>
+    </div>
+  </section>
+
+  <section class="step locked" id="s2">
+    <div class="num">2</div>
+    <div class="body">
+      <h2>导入以前的收藏</h2>
+      <div id="s2Choose">
+        <p>只导入最近一段时间的。一次翻太多页、访问太频繁，对账号不安全；以后新收藏的会自动加进来。</p>
+        <div class="row"><button class="btn blue start" data-days="7" type="button">导入最近 7 天</button><button class="btn ghost start" data-days="30" type="button">导入最近 30 天</button></div>
+      </div>
+      <div id="s2Run" hidden>
+        <p id="runText">正在导入…</p>
+        <div class="bar"><i></i></div>
+        <p class="muted">会在后台开一个 X 页面，抓完自动关掉。这一页可以关，插件会接着抓。</p>
+      </div>
+      <div class="err" id="s2Err" hidden></div>
+      <div class="row" id="s2ErrBtns" hidden><button class="btn" id="retryImport" type="button">重新导入</button><button class="btn" id="retryWrite" type="button" hidden>再试一次</button></div>
+      <div id="s2Done" hidden>
+        <p class="ok" id="doneText">导入好了</p>
+        <p class="muted">每条收藏存成一个 Markdown 文件，在「下载」文件夹的 X收藏 里。<button class="link" id="openFolder" type="button">打开文件夹</button></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="step locked" id="s3">
+    <div class="num">3</div>
+    <div class="body">
+      <h2>打开收藏页</h2>
+      <p>按分类看收藏、标准不准、写备注、马上做，都在收藏页。第一次打开时，它会带你装好 AI 自动分类。</p>
+      <div class="row"><button class="btn blue big" id="openPage" type="button" disabled>打开收藏页</button><span class="muted" id="countdown"></span></div>
+    </div>
+  </section>
+
+  <footer>以前装过这个插件？<button class="link" id="importBtn" type="button">导入备注备份</button>，把以前写的备注找回来（选「下载/X收藏/_备注备份.json」），再导入收藏。<input type="file" id="importFile" accept=".json,application/json" hidden></footer>
+</main>
+<script src="setup.js"></script>
+</body>
+</html>

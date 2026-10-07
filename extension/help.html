@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>怎么让 AI 用你的 X 收藏</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; background: #f7f9f9; font: 15px/1.7 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; color: #0f1419; }
+  main { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  .lead { color: #536471; margin: 0 0 24px; }
+  section { background: #fff; border: 1px solid #eff3f4; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+  h2 { font-size: 17px; margin: 0 0 8px; }
+  p { margin: 0 0 10px; }
+  ul { margin: 0 0 10px; padding-left: 20px; }
+  code { background: #eff3f4; padding: 1px 5px; border-radius: 4px; font-size: 13.5px; }
+  .btn { border: 0; background: #0f1419; color: #fff; border-radius: 999px; padding: 8px 18px; font: 700 14px/1 inherit; font-family: inherit; cursor: pointer; }
+  .btn.blue { background: #1d9bf0; }
+  .ok { color: #067d3d; margin-left: 10px; font-size: 13.5px; }
+  .say li { margin-bottom: 4px; }
+  .muted { color: #536471; font-size: 13.5px; }
+  details summary { cursor: pointer; color: #1d9bf0; }
+  pre { white-space: pre-wrap; background: #f7f9f9; border-radius: 8px; padding: 10px; font-size: 12.5px; max-height: 260px; overflow: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>怎么让 AI 用你的 X 收藏</h1>
+  <p class="lead">插件把每条收藏存成一个 Markdown 文件。教 AI 一次，以后你问它就行。</p>
+
+  <section>
+    <h2>一、收藏存在哪</h2>
+    <p>「下载」文件夹里的 <code>X收藏</code>。每条收藏一个文件，放在 <code>收藏/年-月/</code> 里；最外面的 <code>_索引.md</code> 是总表。</p>
+    <button class="btn" id="openFolder" type="button">打开收藏文件夹</button><span class="ok" id="openMsg"></span>
+  </section>
+
+  <section>
+    <h2>二、装好 AI 分类，教你的 AI 读收藏（做一次）</h2>
+    <p>点下面的按钮，把复制好的一段话发给你的 Claude Code 或 Codex。它会做两件事：装一个本机小程序，让插件能用你电脑上的 Codex 或 Claude Code 自动给收藏分类（用你自己账号的额度，不用填任何密钥）；再装一个读收藏的 Skill，读几条收藏给你看，证明它读得到。</p>
+    <button class="btn blue" id="copyInstall" type="button">复制给 AI</button><span class="ok" id="copyMsg"></span>
+    <details style="margin-top:12px"><summary>看看复制的是什么</summary><pre id="preview"></pre></details>
+  </section>
+
+  <section>
+    <h2>三、收藏页</h2>
+    <p>点插件图标里的「打开收藏页」：左栏按分类看，「可做成视频」按多久内要做排好，卡片上能直接改分类、标准不准、写备注、点「马上做」。AI 分类装好以后，新收藏几秒到一两分钟内自动分好。</p>
+    <p>想按自己的习惯改这个页面，点左栏的「DIY」：复制一段话发给你的 Codex 或 Claude Code，它会先问清楚你想怎么改，你同意了再改。</p>
+  </section>
+
+  <section>
+    <h2>四、以后这样问</h2>
+    <ul class="say">
+      <li>「我收藏过哪些讲 Claude Code 提示词的？」</li>
+      <li>「整理一下我的 X 收藏」（AI 按分类表给每条分类，写在文件最末尾）</li>
+      <li>「这周收藏了什么？哪些能做成内容，哪些快过时了？」</li>
+      <li>在 X 上收藏时，备注框底下点「马上做」：直接开一个 Claude 或 Codex 新对话，开场白带着你的备注和原文。用别的 AI 就点「复制」。</li>
+    </ul>
+    <p class="muted">分类表是默认的，想改就跟 AI 说「X 收藏的分类改成……」。</p>
+  </section>
+
+  <section>
+    <h2>五、想放进 Obsidian 或别的笔记库</h2>
+    <p>插件只能写进「下载」文件夹。在笔记库里建一个指向它的快捷方式就行，Mac 上跟 AI 说：「在我的 Obsidian 库里建一个指向 ~/Downloads/X收藏 的软链接」。</p>
+  </section>
+
+  <section>
+    <h2>六、数据去哪了</h2>
+    <ul>
+      <li>收藏和备注只存在你自己的电脑上：插件存储里一份，「下载/X收藏」里一份。</li>
+      <li>插件用你这个 Chrome 里已经登录的 X 网页去取收藏，读不到也不保存你的密码。</li>
+      <li>AI 分类时，收藏的内容和你的备注交给你电脑上的 Codex 或 Claude Code，由它们按你自己的账号去调模型。</li>
+      <li>遇到 X 长文时，插件会把那条推文的编号发给 <code>api.fxtwitter.com</code> 取全文。不想要就在插件弹窗里取消勾选「抓 X 长文全文」。</li>
+      <li>别在 Chrome 扩展程序页点「移除」：会清掉插件里的备注。真要重装，装好后先在弹窗里「导入备注备份」，选 <code>X收藏/_备注备份.json</code>。</li>
+    </ul>
+  </section>
+</main>
+<script src="install-prompt.js"></script>
+<script src="help.js"></script>
+</body>
+</html>

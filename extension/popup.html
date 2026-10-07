@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>X 收藏备注</title>
+<style>
+  body { width: 380px; margin: 0; font: 13px/1.55 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; color: #0f1419; background: #fff; }
+  body.full { width: auto; max-width: 680px; margin: 24px auto; }
+  header { padding: 12px 14px 10px; border-bottom: 1px solid #eff3f4; }
+  h1 { font-size: 15px; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .btn { border: 0; background: #0f1419; color: #fff; border-radius: 999px; padding: 5px 12px; font: 700 12.5px/1 inherit; font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .btn:hover { opacity: .88; } .btn[disabled] { opacity: .5; cursor: default; }
+  .btn.blue { background: #1d9bf0; }
+  .btn.ghost { background: #fff; color: #0f1419; border: 1px solid #cfd9de; }
+  .spin { width: 11px; height: 11px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .line { font-size: 12.5px; color: #536471; margin-top: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .line a, .link { color: #1d9bf0; cursor: pointer; text-decoration: none; border: 0; background: none; padding: 0; font: inherit; }
+  .syncinfo { font-size: 12.5px; color: #536471; margin-top: 4px; }
+  .syncinfo.ok { color: #067d3d; } .syncinfo.bad { color: #b42318; }
+  .syncinfo:empty { display: none; }
+  .panel { margin: 10px 14px 0; padding: 10px 12px; border-radius: 10px; background: #f7f9f9; font-size: 13px; }
+  .panel.warn { background: #fff4e5; color: #8a4b00; }
+  .panel.bad { background: #fdecea; color: #8c1d18; }
+  .panel p { margin: 0 0 8px; }
+  .panel ol { margin: 0 0 8px; padding-left: 20px; }
+  .panel[hidden] { display: none; }
+  h2 { font-size: 13px; margin: 12px 14px 4px; display: flex; align-items: baseline; gap: 6px; }
+  h2 .count { color: #1d9bf0; }
+  h2 .sub { font-weight: 400; color: #8b98a5; font-size: 12px; }
+  ul { list-style: none; margin: 0; padding: 2px 0 6px; max-height: 300px; overflow: auto; }
+  body.full ul { max-height: none; }
+  li { padding: 7px 14px; border-bottom: 1px solid #f7f9f9; }
+  .group { font-size: 11.5px; color: #8b98a5; margin: 6px 14px 0; }
+  .missing li { display: flex; gap: 8px; align-items: center; }
+  .who { flex: 1; min-width: 0; }
+  .who b { font-weight: 600; }
+  .ex { color: #536471; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .go { flex: none; border: 0; background: #1d9bf0; color: #fff; border-radius: 999px; padding: 4px 10px; font: 600 12px/1 inherit; font-family: inherit; cursor: pointer; }
+  .draft { font-size: 11px; color: #b54708; }
+  .note { overflow-wrap: anywhere; white-space: pre-wrap; }
+  .meta { font-size: 11.5px; color: #8b98a5; margin-top: 2px; }
+  .meta a { color: #1d9bf0; text-decoration: none; }
+  .done { color: #067d3d; font-size: 12.5px; }
+  .empty { color: #536471; }
+  footer { padding: 8px 14px 12px; font-size: 12px; color: #536471; border-top: 1px solid #eff3f4; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+  code { background: #eff3f4; padding: 0 4px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>X 收藏备注 <button class="btn" id="syncNow" type="button" title="抓上次同步以后新收藏的，几秒钟">从 X 同步</button></h1>
+  <div class="line" id="summary">正在读取…</div>
+  <div class="line" id="openPageRow" hidden><button class="btn blue" id="openPage" type="button">打开收藏页</button><span id="aiLine"></span><button class="btn" id="goAi" type="button" hidden>去装</button></div>
+  <div class="syncinfo" id="syncInfo"></div>
+</header>
+
+<div class="panel" id="welcome" hidden>
+  <p><b>还没设置好。</b>一共三步：登录 X、导入最近的收藏、打开收藏页。</p>
+  <button class="btn blue" id="goSetup" type="button">继续设置</button>
+</div>
+
+<div class="panel bad" id="writeError" hidden><p id="writeErrorText"></p><button class="btn" id="retryWrite" type="button">再试一次</button></div>
+<div class="panel warn" id="watchdog" hidden><p>最近点了收藏按钮，却没看到 X 的收藏请求，可能是 X 改版了，插件需要更新。</p><button class="link" id="clearWatchdog" type="button">知道了</button></div>
+
+<h2>还没写为什么收藏 <span class="count" id="missingCount"></span><span class="sub">最近 3 天</span></h2>
+<ul class="missing" id="missing"></ul>
+<h2>最近写的</h2>
+<ul id="list"></ul>
+
+<footer>
+  <button class="link" id="openFull" type="button">在新标签页打开</button>
+  <button class="link" id="importBtn" type="button">导入备注备份</button>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+  <label title="X 长文在书签列表里只有一个链接；打开后插件会向 api.fxtwitter.com 要长文全文（只发推文编号）"><input type="checkbox" id="articles"> 抓 X 长文全文</label>
+  <a class="link" href="help.html" target="_blank">怎么让 AI 用这些收藏</a>
+</footer>
+<script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "X 收藏备注",
+  "version": "0.1.4",
+  "description": "在 X 上点收藏时顺手写一句为什么存；收藏全文自动存成 Markdown 文件，你的 AI 直接读、直接搜。",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuVEk5TX670vHShXGhLzr9vXCmnYDa1ijZmGFGKFs/WVERH+Lpilh9EhJrRX/HTb7elPOGKrYDF1YgN+jNm1pnG615M3DIIdMm9kaRuAmkJnEvXWXHHmA1Yo6ApwXk7Dp/qAZzo34mTtYanQdxj2WBtXzB3cT7RW4c0JIIpRZN+HGvJpUqPAFJdn0LD+Dw6nPkTbLqjBqmuoqyeGwBU6FYdB+33wHbkvEtivl5UHArlRLQ60+FovnMFLy4djoCkFNEpT7ujJe042SXpj+y+GjrvqP9NmfOJN+miJ+LCOvcFKLejH2vRDLuKiq+McVymFFZ9AkS+1coDQ767xWpqHY2QIDAQAB",
+  "minimum_chrome_version": "120",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "alarms",
+    "webRequest",
+    "scripting",
+    "downloads",
+    "downloads.ui",
+    "nativeMessaging",
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://pro.x.com/*",
+    "https://twitter.com/*",
+    "https://api.x.com/*",
+    "https://api.fxtwitter.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://x.com/*",
+        "https://pro.x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "card.html",
+        "card.js"
+      ],
+      "matches": [
+        "https://x.com/*",
+        "https://pro.x.com/*",
+        "https://twitter.com/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "X 收藏备注",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png"
+    }
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  }
+}
