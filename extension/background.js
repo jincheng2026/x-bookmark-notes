@@ -422,12 +422,15 @@ async function doSync(mode, { tabId, openTab }) {
   const floor = Number(meta.importFloor) || 0;
   const refresh = mode !== "import" && Date.now() - (Date.parse(meta.lastRefreshAt || "") || 0) >= REFRESH_EVERY_MS;
   await setSyncState({ state: "running", mode, pages: 0, seen: 0, added: 0 });
-  let cursor = null, pages = 0, seen = 0, added = 0;
-  const changedAll = [];
+  let cursor = null, pages = 0, seen = 0, added = 0, reachedEnd = false;
+  const changedAll = [], fetched = new Map(); // 这次从 X 抓到的每一条：编号 → 收藏时间，核对别处取消的收藏用
+  const startedAt = Date.now();
   try {
     while (pages < (refresh ? REFRESH_PAGES : MAX_PAGES[mode] || 10)) {
       const { items, cursor: next } = await fetchPageSmart(tab, cursor, PAGE_SIZE);
       pages += 1;
+      for (const i of items) fetched.set(i.id, Date.parse(i.bookmarkedAt || "") || null);
+      if (!next || !items.length) reachedEnd = true;
       const inWindow = items.filter((i) => !floor || !i.bookmarkedAt || Date.parse(i.bookmarkedAt) >= floor);
       seen += inWindow.length;
       const { changed, added: plus, known } = await mergeItems(inWindow);
@@ -442,6 +445,7 @@ async function doSync(mode, { tabId, openTab }) {
     await setMeta({ lastSyncAt: new Date().toISOString(), lastSyncError: null, indexDirty: true, ...(refresh || mode === "import" ? { lastRefreshAt: new Date().toISOString() } : {}),
       ...(mode === "import" ? { importDoneAt: new Date().toISOString(), importAdded: added, importError: null } : {}) });
     await setSyncState({ state: "done", mode, pages, seen, added });
+    if (refresh) await findRemoved(fetched, { reachedEnd, startedAt }).catch(() => undefined);
     scheduleWrite(200);
     fillArticles(changedAll).catch(() => undefined);
     scheduleClassify(15000);
@@ -456,6 +460,30 @@ async function doSync(mode, { tabId, openTab }) {
     await refreshBadge();
   }
 }
+// 在别处取消的收藏（手机上、别的电脑上）：X 书签列表按收藏先后排，每次都从最新的往下翻，
+// 所以这次翻到的最早那条以后收藏的，都该在这次翻到的里面；插件里在这个范围、这次却没翻到的，就是取消了。
+// X 偶尔会漏返几条，所以连续两次（隔 20 分钟以上）都没翻到才算取消；中间又翻到就作罢。翻到底了就核对全部。
+const MISSING_CONFIRM_MS = 20 * 60000;
+async function findRemoved(fetched, { reachedEnd, startedAt }) {
+  const times = [...fetched.values()].filter(Boolean);
+  if (!times.length) return;
+  const floor = reachedEnd ? 0 : Math.min(...times);
+  const { items } = await allItems();
+  const meta = await getMeta();
+  const missing = meta.missingSince || {}, next = {}, gone = [];
+  const now = Date.now();
+  for (const t of items) {
+    if (t.stub || t.removedAt || fetched.has(t.id)) continue;
+    const at = Date.parse(t.bookmarkedAt || "");
+    if (!at || at < floor || at >= startedAt - 60000) continue; // 比这次翻到的都早的不判断；翻的过程中刚收藏的不算
+    const since = Date.parse(missing[t.id] || "");
+    if (since && now - since >= MISSING_CONFIRM_MS) gone.push(t.id);
+    else next[t.id] = since ? missing[t.id] : new Date(now).toISOString();
+  }
+  await setMeta({ missingSince: next });
+  for (const id of gone) await onUnbookmark(id);
+}
+
 let quickTimer = 0;
 function scheduleQuickSync(tabId) { // 收藏后几秒抓一页最新的，把刚收藏那条的全文补上
   clearTimeout(quickTimer);

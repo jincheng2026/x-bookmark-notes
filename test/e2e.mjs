@@ -327,6 +327,27 @@ try {
   ok(await waitFor(async () => (await bg("chrome.storage.local.get('syncState').then((s) => s.syncState)")).state === "done", 8000), "用新编号同步成功");
   ok(qidHits.some((h) => h.qid === "NEWQID" && h.features?.includes("learned_feature")), "连 X 网页用的参数一起学过来了");
 
+  // 在手机上取消的收藏：插件看不到「取消收藏」的请求，靠同步时核对。连续两次（隔 20 分钟以上）都没翻到才算取消
+  bookmarked.delete(ART);
+  const meta = () => bg("chrome.storage.local.get('meta').then((s) => s.meta)");
+  const resync = async () => {
+    await bg("chrome.storage.local.get('meta').then(({ meta }) => chrome.storage.local.set({ meta: { ...meta, lastRefreshAt: null } }))"); // 当成离上次重看已经过了 30 分钟
+    await evalIn(popS, `chrome.runtime.sendMessage({ type: "xbn-sync", mode: "quick" })`);
+    await sleep(500);
+    return waitFor(async () => (await bg("chrome.storage.local.get('syncState').then((s) => s.syncState)")).state === "done", 15000);
+  };
+  await resync();
+  ok(Boolean((await meta()).missingSince?.[ART]) && !(await bg(`chrome.storage.local.get('t:${ART}').then((s) => s['t:${ART}'].removedAt)`)), "手机上取消的收藏：第一次没翻到，先记下，不马上算取消", (await meta()).missingSince);
+  await bg(`chrome.storage.local.get('meta').then(({ meta }) => chrome.storage.local.set({ meta: { ...meta, missingSince: { ...meta.missingSince, "${ART}": new Date(Date.now() - 30 * 60000).toISOString() } } }))`); // 当成第一次没翻到是半小时前
+  await resync();
+  ok(await waitFor(async () => Boolean(await bg(`chrome.storage.local.get('t:${ART}').then((s) => s['t:${ART}'].removedAt)`)), 5000), "隔 20 分钟以上第二次还没翻到：算取消收藏");
+  ok(await waitFor(() => read(fileOf(ART)).includes("状态: 已取消收藏"), 8000), "手机上取消的收藏，文件也标成「已取消收藏」");
+  const scLive = await evalIn(popS, `chrome.runtime.sendMessage({ type: "xbn-api", path: "/api/shoucang" }).then((r) => r.items.map((i) => i.id))`);
+  ok(!scLive.includes(ART) && scLive.includes(C), "收藏页里不再有取消了的那条，别的还在", scLive);
+  bookmarked.add(ART);
+  await resync();
+  ok(await waitFor(async () => !(await bg(`chrome.storage.local.get('t:${ART}').then((s) => s['t:${ART}'].removedAt)`)), 5000), "又收藏回来：同步时翻到，标回「收藏中」");
+
   // 导入备注备份：更新的不被旧的盖掉
   const imported = await evalIn(popS, `chrome.runtime.sendMessage({ type: "xbn-import-notes", backup: { version: 1, notes: { "${B}": { text: "从备份导回来的备注", at: "2026-01-01T00:00:00Z" }, "${A}": { text: "更旧的一版", at: "2000-01-01T00:00:00Z" } } } })`);
   ok(imported.ok && imported.count === 1, "导入备份：导回 1 条，插件里更新的那条没被盖掉", imported);
