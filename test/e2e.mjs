@@ -33,9 +33,9 @@ const freePort = () => new Promise((r) => { const s = createNetServer(); s.liste
 const NOW = Date.now();
 const sortIndex = (msAgo) => String(BigInt(NOW - msAgo) << 20n);
 const user = (name, handle) => ({ user_results: { result: { __typename: "User", legacy: { name, screen_name: handle, followers_count: 1000 } } } });
-function tweet({ id, name, handle, text, note, quoted, media }) {
-  const t = { __typename: "Tweet", rest_id: id, core: user(name, handle), views: { count: "5000" },
-    legacy: { id_str: id, full_text: text, created_at: new Date(NOW - 86400000).toUTCString(), favorite_count: 12, retweet_count: 3, reply_count: 1, quote_count: 0, bookmark_count: 40,
+function tweet({ id, name, handle, text, note, quoted, media, views = 5000, postedAgo = 86400000 }) {
+  const t = { __typename: "Tweet", rest_id: id, core: user(name, handle), views: { count: String(views) },
+    legacy: { id_str: id, full_text: text, created_at: new Date(NOW - postedAgo).toUTCString(), favorite_count: 12, retweet_count: 3, reply_count: 1, quote_count: 0, bookmark_count: 40,
       entities: { urls: [{ url: "https://t.co/abc", expanded_url: "https://github.com/example/repo" }] }, ...(media ? { extended_entities: { media } } : {}) } };
   if (note) t.note_tweet = { note_tweet_results: { result: { text: note, entity_set: { urls: [] } } } };
   if (quoted) t.quoted_status_result = { result: quoted };
@@ -44,7 +44,7 @@ function tweet({ id, name, handle, text, note, quoted, media }) {
 const entry = (t, msAgo) => ({ entryId: `tweet-${t.rest_id}`, sortIndex: sortIndex(msAgo), content: { itemContent: { tweet_results: { result: t } } } });
 const A = "2201000000000000001", B = "2201000000000000002", C = "2201000000000000003", D = "2201000000000000004", ART = "2201000000000000005", OLD = "2201000000000000006", OLD2 = "2201000000000000007";
 const base = [
-  entry(tweet({ id: B, name: "博主乙", handle: "bb", text: "长推文的短版本", note: "这是长推文的完整正文，链接 https://github.com/example/repo", media: [{ type: "photo", media_url_https: "https://pbs.twimg.com/media/x.jpg", url: "https://t.co/pic" }] }), 3600e3),
+  entry(tweet({ id: B, name: "博主乙", handle: "bb", views: 90000, postedAgo: 10 * 3600e3, text: "长推文的短版本", note: "这是长推文的完整正文，链接 https://github.com/example/repo", media: [{ type: "photo", media_url_https: "https://pbs.twimg.com/media/x.jpg", url: "https://t.co/pic" }] }), 3600e3),
   entry(tweet({ id: C, name: "博主丙", handle: "cc", text: "我觉得这个说法不对 https://t.co/abc", quoted: tweet({ id: "2201000000000000099", name: "博主庚", handle: "gg", text: "被引用的原帖" }) }), 2 * 86400e3),
   entry(tweet({ id: ART, name: "博主戊", handle: "ee", text: "https://x.com/i/article/2201999" }), 5 * 86400e3),
   entry(tweet({ id: OLD, name: "博主己", handle: "ff", text: "20 天前收藏的" }), 20 * 86400e3),
@@ -246,7 +246,12 @@ try {
   ok(await waitFor(() => read(fileOf(C)).includes("- 分类：AI 实操 / 工具") && read(fileOf(C)).includes("插件自动分类，用 Codex"), 15000), "分好的类写进了收藏文件末尾的「AI 整理」", read(fileOf(C)).slice(-400));
   const sc = setupT;
   const navText = await evalIn(scS, "document.querySelector('#nav').innerText");
-  ok(["信息差", "AI 实操", "认知", "做内容参考", "可做成视频"].every((x) => navText.includes(x)) && !navText.includes("流量爆帖") && !navText.includes("正在做"), "左栏有四个大类和「可做成视频」，没有只给作者用的两栏", navText);
+  ok(["信息差", "AI 实操", "认知", "做内容参考", "可做成视频"].every((x) => navText.includes(x)) && navText.includes("流量爆帖") && !navText.includes("正在做"), "左栏有四个大类、「可做成视频」和「流量爆帖」，没有只给作者用的「正在做」", navText);
+  await evalIn(scS, "location.hash = '#hot'; true");
+  const hotText = await waitFor(async () => { const t = await evalIn(scS, "document.querySelector('#feed').innerText"); return t.includes("长推文") ? t : null; }, 5000);
+  ok(Boolean(hotText) && hotText.includes("怎么算流量爆帖") && (await evalIn(scS, "document.querySelectorAll('#feed article.tw').length")) === 1 && (await evalIn(scS, "!!document.querySelector('#feed .hotbox')")), "「流量爆帖」里只有发出 10 小时就 9 万浏览的那条，卡片上写着为什么算爆帖", hotText?.slice(0, 300));
+  await shot(scS, "4b-收藏页-流量爆帖");
+  await evalIn(scS, "location.hash = ''; true");
   ok(await waitFor(async () => (await evalIn(scS, "document.querySelector('#feed').innerText")).includes("工具"), 8000), "卡片上显示了 AI 分的类", await evalIn(scS, "document.querySelector('#feed').innerText.slice(0, 400)"));
   await evalIn(scS, "(() => { const q = document.querySelector('#q'); q.value = '测试分类：这是'; q.dispatchEvent(new Event('input')); return true; })()");
   ok(await waitFor(async () => (await evalIn(scS, "document.querySelectorAll('#feed article.tw').length")) === 1, 5000), "用 AI 写的「讲的是」里的字能搜到这条", await evalIn(scS, "document.querySelectorAll('#feed article.tw').length"));
@@ -260,6 +265,7 @@ try {
   await evalIn(scS, "document.getElementById('diy').click(), true");
   const diy = await waitFor(async () => { const t = await evalIn(scS, "navigator.clipboard.readText().catch(() => '')"); return t.includes("先别动手") ? t : null; }, 5000);
   ok(Boolean(diy) && diy.includes("一次只问一到三个问题") && diy.includes("等我说「可以」再动手") && diy.includes("chrome://extensions"), "点 DIY 复制了一段话：先一轮轮问清楚、复述、等同意再改、改完提醒刷新", diy?.slice(0, 200));
+  ok(["我是做什么的", "拿来干什么", "看最近 7 天的收藏", "看最近 30 天的收藏", "如无必要，勿增实体", "ABOUT_ME"].every((x) => diy?.includes(x)), "DIY 那段话先问读者是做什么的、收藏来干什么，让他选看最近 7 天还是 30 天的收藏，再按他的用法给分类建议");
   if (process.env.XBN_DIY) writeFileSync(process.env.XBN_DIY, diy || "");
   ok(diy?.includes("正在看「可做成视频」这一栏"), "DIY 那段话里带着现在看的是哪一栏", diy?.slice(-120));
   await evalIn(scS, "location.hash = ''; true");

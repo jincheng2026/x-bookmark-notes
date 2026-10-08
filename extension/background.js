@@ -10,7 +10,8 @@
 
 import { parseBookmarksPage, PUBLIC_BEARER, FALLBACK_QUERY_ID, DEFAULT_FEATURES } from "./lib/parse.js";
 import { renderBookmark, renderIndex, fileNameFor, fingerprint, ROOT, localTime } from "./lib/markdown.js";
-import { TAXONOMY, DO_WITHIN, VIDEO_KINDS, STATUSES, MINOR_TO_MAJOR, BATCH_SIZE, classifierInstructions, intentOutputSchema, normalizeIntent } from "./lib/classify.js";
+import { HOT_RULES, hotStatus, snapOf, addSnap } from "./lib/hot.js";
+import { ABOUT_ME, TAXONOMY, DO_WITHIN, VIDEO_KINDS, STATUSES, MINOR_TO_MAJOR, BATCH_SIZE, classifierInstructions, intentOutputSchema, normalizeIntent } from "./lib/classify.js";
 
 const GRAPHQL_URLS = ["https://x.com/i/api/graphql/*", "https://pro.x.com/i/api/graphql/*", "https://twitter.com/i/api/graphql/*", "https://api.x.com/graphql/*"];
 const BOOKMARK_OP = /\/graphql\/[^/?]+\/(CreateBookmark|DeleteBookmark|bookmarkTweetToFolder|BookmarkTweetToFolder)(?:[?#]|$)/;
@@ -22,13 +23,17 @@ const ID = /^\d{8,25}$/;
 const PAGE_SIZE = 20;
 const PAGE_DELAY_MS = 2000;
 const MAX_PAGES = { import: 60, quick: 10, auto: 10 };
+// 流量爆帖要定期重看最近收藏的数字：每 30 分钟最多一次，翻最近 100 条（5 页）。作者自用版也是这个频率
+const REFRESH_EVERY_MS = 30 * 60000, REFRESH_PAGES = 5;
+const STALE_MS = 10 * 60000; // 上次同步超过 10 分钟，打开 X 页面或收藏页时就自己同步一次
 const IMPORT_DAYS = [7, 30]; // 第一次只导入最近 7 天或 30 天的收藏，不一口气翻完全部
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- 存储 ----------
 // t:<id> 一条收藏；n:<id> 备注；w:<id> 文件上次写进去的指纹；meta 其他状态
 // i:<id> AI 分类；r:<id> 你在收藏页上的批注（准不准、改的标签、状态、多久内做、不做了、延期）
-const T = (id) => `t:${id}`, N = (id) => `n:${id}`, W = (id) => `w:${id}`, I = (id) => `i:${id}`, R = (id) => `r:${id}`;
+// m:<id> 每次同步记下的浏览、点赞等数字（算流量爆帖用，见 lib/hot.js）
+const T = (id) => `t:${id}`, N = (id) => `n:${id}`, W = (id) => `w:${id}`, I = (id) => `i:${id}`, R = (id) => `r:${id}`, M = (id) => `m:${id}`;
 let chain = Promise.resolve();
 function serial(fn) { // 改存储串行做，两个标签页同时写不会把对方盖掉
   const run = chain.then(fn);
@@ -330,10 +335,13 @@ async function mergeItems(items) {
   let added = 0, known = 0;
   await serial(async () => {
     const keys = items.map((i) => T(i.id));
-    const existing = await chrome.storage.local.get(keys);
+    const existing = await chrome.storage.local.get([...keys, ...items.map((i) => M(i.id))]);
     const patch = {};
     const now = new Date().toISOString();
     for (const item of items) {
+      const snap = snapOf(item.metrics, Date.parse(now));
+      const snaps = snap && addSnap(existing[M(item.id)], snap);
+      if (snaps) patch[M(item.id)] = snaps;
       const prev = existing[T(item.id)];
       if (!prev) added += 1;
       else if (!prev.stub) known += 1;
@@ -409,13 +417,15 @@ async function doSync(mode, { tabId, openTab }) {
   }
   // X 书签列表按收藏时间从新到旧排。每次都从最新的往下翻，翻到下面任一种情况就停：
   // 碰到已经存过的收藏（再往下都存过了）；碰到比「导入起点」更早的收藏（第一次选的 7 天或 30 天以前）；没有下一页。
+  // 不是第一次导入的同步，隔 30 分钟以上的那一次多翻几页：碰到存过的也不停，翻满最近 100 条，给每条记一笔新数字，算流量爆帖用。
   const meta = await getMeta();
   const floor = Number(meta.importFloor) || 0;
+  const refresh = mode !== "import" && Date.now() - (Date.parse(meta.lastRefreshAt || "") || 0) >= REFRESH_EVERY_MS;
   await setSyncState({ state: "running", mode, pages: 0, seen: 0, added: 0 });
   let cursor = null, pages = 0, seen = 0, added = 0;
   const changedAll = [];
   try {
-    while (pages < (MAX_PAGES[mode] || 10)) {
+    while (pages < (refresh ? REFRESH_PAGES : MAX_PAGES[mode] || 10)) {
       const { items, cursor: next } = await fetchPageSmart(tab, cursor, PAGE_SIZE);
       pages += 1;
       const inWindow = items.filter((i) => !floor || !i.bookmarkedAt || Date.parse(i.bookmarkedAt) >= floor);
@@ -425,11 +435,11 @@ async function doSync(mode, { tabId, openTab }) {
       changedAll.push(...changed);
       if (changed.length) await markDirty(changed);
       await setSyncState({ state: "running", mode, pages, seen, added });
-      if (!next || !items.length || inWindow.length < items.length || known > 0) break;
+      if (!next || !items.length || inWindow.length < items.length || (known > 0 && !refresh)) break;
       cursor = next;
       await sleep(PAGE_DELAY_MS);
     }
-    await setMeta({ lastSyncAt: new Date().toISOString(), lastSyncError: null, indexDirty: true,
+    await setMeta({ lastSyncAt: new Date().toISOString(), lastSyncError: null, indexDirty: true, ...(refresh || mode === "import" ? { lastRefreshAt: new Date().toISOString() } : {}),
       ...(mode === "import" ? { importDoneAt: new Date().toISOString(), importAdded: added, importError: null } : {}) });
     await setSyncState({ state: "done", mode, pages, seen, added });
     scheduleWrite(200);
@@ -516,7 +526,7 @@ function workPrompt(item, note) {
 // ---------- AI 分类：交给本机小程序，小程序调这台电脑上的 Codex 或 Claude Code ----------
 const HOST = "com.x_bookmark_notes.host";
 const noteHash = (note) => fingerprint(String(note?.text || "").trim());
-const TAXONOMY_PRINT = fingerprint(JSON.stringify(TAXONOMY)); // 分类树改过（比如读者 DIY 改了分类），已经分好的也按新分类重分
+const TAXONOMY_PRINT = fingerprint(JSON.stringify([ABOUT_ME, TAXONOMY])); // 分类树或「我是谁」改过（比如读者 DIY 改了分类），已经分好的也按新分类重分
 // 文件和收藏页上用的分类：AI 分的，你在收藏页上直接改过标签、可做成什么的以你改的为准；AI 分类依据的备注已经改过就不算
 function effectiveIntent(intent, review, note) {
   const fresh = intent && intent.noteHash === noteHash(note) ? intent : null;
@@ -734,8 +744,15 @@ async function shoucangData() {
   const { items, notes, all } = await allItems();
   const meta = await getMeta();
   const live = items.filter((t) => !t.stub && !t.removedAt).sort((a, b) => String(b.bookmarkedAt || b.firstSeenAt).localeCompare(String(a.bookmarkedAt || a.firstSeenAt)));
-  const intents = {}, reviews = {}, avatars = {}, videos = {};
+  const intents = {}, reviews = {}, avatars = {}, videos = {}, hot = {}, latest = {};
   for (const t of live) {
+    const snaps = all[M(t.id)];
+    if (snaps?.length) {
+      const h = hotStatus(t, snaps);
+      if (h) hot[t.id] = h;
+      const s = snaps[snaps.length - 1];
+      latest[t.id] = { ...(t.metrics || {}), views: s[1], likes: s[2], replies: s[3], quotes: s[4], bookmarks: s[5] };
+    }
     const intent = all[I(t.id)];
     if (intent && intent.noteHash === noteHash(notes[t.id])) intents[t.id] = { ...intent, tags: (intent.tags || []).filter((x) => MINOR_TO_MAJOR.has(x.minor)).map((x) => ({ major: MINOR_TO_MAJOR.get(x.minor), minor: x.minor })) };
     const review = all[R(t.id)];
@@ -748,7 +765,7 @@ async function shoucangData() {
   const d = new Date(floor), pad = (n) => String(n).padStart(2, "0");
   return {
     ok: true, since: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, taxonomy: TAXONOMY, doWithin: DO_WITHIN,
-    items: live.map((t) => pageItem(t, notes[t.id])), intents, reviews, avatars, videos, hot: {}, hotRules: null, topicUse: {}, working: {},
+    items: live.map((t) => ({ ...pageItem(t, notes[t.id]), ...(latest[t.id] ? { metrics: latest[t.id] } : {}) })), intents, reviews, avatars, videos, hot, hotRules: HOT_RULES, topicUse: {}, working: {},
     sync: { lastXSuccessAt: meta.lastSyncAt || null }, classify: await classifyStatus(),
   };
 }
@@ -783,6 +800,12 @@ async function pageApi(path, body) {
   }
   if (path === "/api/bookmark-notes/sync") {
     if (body === undefined) return { ok: true, running: Boolean(syncing), lastState: (await chrome.storage.local.get("syncState")).syncState?.state || null };
+    if (body?.ifStale) { // 收藏页一打开就问一次：好一阵没同步了，就自己同步（没开着 X 页面就在后台开一个，抓完关掉）
+      const meta = await getMeta();
+      if (!meta.setupDone || Date.now() - (Date.parse(meta.lastSyncAt || "") || 0) < STALE_MS) return { ok: true, state: "fresh" };
+      sync("auto", { openTab: true }).catch(() => undefined);
+      return { ok: true, state: "started" };
+    }
     sync("quick", { openTab: true }).catch(() => undefined);
     await sleep(50);
     return { ok: true, state: "started" };
@@ -952,8 +975,31 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (!meta.setupDone) return;
   scheduleWrite(100);
   if (!meta.lastSyncAt || Date.now() - Date.parse(meta.lastSyncAt) > 30 * 60000) sync("auto").catch(() => undefined);
+  if (Date.now() - (Date.parse(meta.snapsCleanedAt || "") || 0) > 86400000) cleanSnaps().catch(() => undefined);
   if (meta.hostInstalled !== false) classify("auto").catch(() => undefined); // 有还没分类的就分（失败过的 30 分钟内不自动重试）
 });
+// 你一打开或切到 X 页面，上次同步又超过 10 分钟，就马上同步一次：手机上收藏的，电脑上一打开 X 就进来了
+async function syncIfStale(tabId) {
+  const meta = await getMeta();
+  if (!meta.setupDone || syncing) return;
+  if (Date.now() - (Date.parse(meta.lastSyncAt || "") || 0) < STALE_MS) return;
+  sync("auto", { tabId }).catch(() => undefined);
+}
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  chrome.tabs.get(tabId).then((tab) => { if (tab.status === "complete" && X_PAGE.test(tab.url || "")) syncIfStale(tabId); }).catch(() => undefined);
+});
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (info.status === "complete" && tab.active && X_PAGE.test(tab.url || "")) syncIfStale(tabId);
+});
+// 十天没再看到的收藏（取消了，或者排到最近 100 条以后了），数字记录删掉
+async function cleanSnaps() {
+  await serial(async () => {
+    const all = await chrome.storage.local.get(null);
+    const old = Object.entries(all).filter(([k, v]) => k.startsWith("m:") && (!Array.isArray(v) || !v.length || Date.now() - v[v.length - 1][0] > 10 * 86400000)).map(([k]) => k);
+    if (old.length) await chrome.storage.local.remove(old);
+  });
+  await setMeta({ snapsCleanedAt: new Date().toISOString() });
+}
 async function injectIntoOpenTabs() { // 插件装好、更新后，把脚本放进已经开着的 X 页面
   const tabs = await chrome.tabs.query({ url: X_TABS }).catch(() => []);
   for (const tab of tabs) chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] }).catch(() => undefined);

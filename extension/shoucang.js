@@ -8,7 +8,9 @@ const ICONS = {"circle-plus": "<path d=\"M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0\" 
 const ME = {name:"我", handle:""};
 const STATUSES = [["现在就用","bolt","马上要用：做成选题，或当素材用进手头的内容"],["先存着","bookmark","暂时用不上，需要时再来找"],["用过了","circle-check","已经用在视频或项目里"],["丢掉","trash","这里不再显示，X 上的书签还在"]];
 const VIDEOS = [["教程","settings"],["观点","message"],["科普","bulb"]];
-const VIEWS = [["all","x-home","全部收藏"],["today","clock","今天"],["make","player-play","可做成视频"],["nonote","message","没写备注"],["pending","hourglass","未分类"]];
+const VIEWS = [["all","x-home","全部收藏"],["today","clock","今天"],["make","player-play","可做成视频"],["hot","flame","流量爆帖"],["nonote","message","没写备注"],["pending","hourglass","未分类"]];
+// 左栏删掉「可做成视频」或「流量爆帖」（比如 DIY 时不做内容的人不要这两栏），卡片、右栏、菜单里跟它有关的字也一起不显示
+const SHOW_MAKE = VIEWS.some(([k]) => k === "make"), SHOW_HOT = VIEWS.some(([k]) => k === "hot");
 // 选中时：有实心版的用实心，没有的（放大镜）加粗线条，和 X 的「探索」一样。x-home、x-article 是照 X 的「主页」「文章」图标画的
 const MAJOR_IC = {"信息差":"search","AI 实操":"x-article","认知":"bulb","做内容参考":"camera"};
 let NOW = Date.now(); const today = new Date(); today.setHours(0,0,0,0);
@@ -219,12 +221,12 @@ function tweetHtml(it){
   const c = cls(it), note = noteOf(it).trim(), L = reviewOf(it.id);
   const name = it.author || it.handle || "未知作者", handle = (it.handle || "").replace(/^@+/, ""), status = statusOf(it), views = it.metrics?.views || 0;
   const [shown, long] = shortText(it.text || ""), full = st.expanded.has(it.id);
-  let h = `<div class="meta"><span class="nm">${esc(name)}</span>${handle ? `<span class="hd">@${esc(handle)}</span>` : ""}<span class="sep">·</span><a class="tm" href="${esc(it.url)}" target="_blank" rel="noopener" style="color:inherit" title="${esc(timeTip(it))}">${pubLabel(it)}</a><span class="sep">·</span><span class="sv" title="${esc(timeTip(it))}">${savedLabel(it)}</span>${views >= 500000 ? `<span class="fl">· 爆款</span>` : ""}${HOT[it.id] ? `<span class="hotb">· 流量爆帖</span>` : ""}${c?.noText ? `<span class="fl">· 正文没抓到</span>` : ""}<span class="more"><button class="icbtn" data-act="menu" data-id="${it.id}" data-tip="更多" aria-label="更多">${ic("dots", 18.75)}</button></span></div>`;
+  let h = `<div class="meta"><span class="nm">${esc(name)}</span>${handle ? `<span class="hd">@${esc(handle)}</span>` : ""}<span class="sep">·</span><a class="tm" href="${esc(it.url)}" target="_blank" rel="noopener" style="color:inherit" title="${esc(timeTip(it))}">${pubLabel(it)}</a><span class="sep">·</span><span class="sv" title="${esc(timeTip(it))}">${savedLabel(it)}</span>${views >= 500000 ? `<span class="fl">· 爆款</span>` : ""}${SHOW_HOT && HOT[it.id] ? `<span class="hotb">· 流量爆帖</span>` : ""}${c?.noText ? `<span class="fl">· 正文没抓到</span>` : ""}<span class="more"><button class="icbtn" data-act="menu" data-id="${it.id}" data-tip="更多" aria-label="更多">${ic("dots", 18.75)}</button></span></div>`;
   if (!c) h += `<div class="ai">${ic("sparkles", 15)}<span>还没分类</span><span>·</span>${CLASSIFY.running ? `<span>AI 正在分…</span>` : `<a href="#" data-act="judge" class="dt">让 AI 分一下</a>`}</div>`;
   else {
     const tags = c.tags.map(([a, b]) => `<button class="tg" data-major="${esc(a)}" data-minor="${esc(b)}">${esc(b)}</button>`).join(`<span class="dot">·</span>`);
     const more = c.readout || c.statusNote || c.keywords?.length;
-    h += `<div class="tagline">${makeable(it) ? makePill(it) : ""}<span class="tgs">${tags || `<span class="none">没分进标签</span>`}</span><button class="dt" data-act="edit" data-id="${it.id}" title="${c.edited ? "你改过分类" : "分得不对就直接改"}">${c.edited ? "你改过" : "改"}</button>${more ? `<button class="dt" data-act="ai" data-id="${it.id}">${st.aiOpen.has(it.id) ? "收起" : "详情"}</button>` : ""}</div>`;
+    h += `<div class="tagline">${SHOW_MAKE && makeable(it) ? makePill(it) : ""}<span class="tgs">${tags || `<span class="none">没分进标签</span>`}</span><button class="dt" data-act="edit" data-id="${it.id}" title="${c.edited ? "你改过分类" : "分得不对就直接改"}">${c.edited ? "你改过" : "改"}</button>${more ? `<button class="dt" data-act="ai" data-id="${it.id}">${st.aiOpen.has(it.id) ? "收起" : "详情"}</button>` : ""}</div>`;
     if (c.about && !mostlyChinese(it.text || it.articleTitle || "")) h += `<div class="about">${ic("sparkles", 15)}<span>讲的是：${esc(c.about)}</span></div>`; // 英文帖先用一句中文说讲什么
     if (st.aiOpen.has(it.id)) h += `<div class="ai-more">${c.about ? `<div>讲的是：${esc(c.about)}</div>` : ""}${c.readout ? `<div>还读出：${esc(c.readout)}</div>` : ""}${c.statusNote ? `<div>处理建议：${esc(c.status)} · ${esc(c.statusNote)}</div>` : ""}${c.keywords?.length ? `<div>关键词：${c.keywords.map((k) => `<button class="kw" data-kw="${esc(k)}">${esc(k)}</button>`).join("、")}</div>` : ""}</div>`;
   }
@@ -294,13 +296,13 @@ function hotNow(h){
 }
 const HOT_HINT = { discuss: (r) => `回复和引用特别多（是点赞的 ${fmtPct(r)}），大家在讨论`, save: (r) => `收藏特别多（是点赞的 ${r.toFixed(1)} 倍），大家存着准备照着做` };
 function hotHtml(it){
-  const h = HOT[it.id]; if (!h) return "";
+  const h = SHOW_HOT && HOT[it.id]; if (!h) return "";
   const hints = (h.hints || []).map((x) => HOT_HINT[x.kind]?.(x.ratio)).filter(Boolean);
   return `<div class="hotbox"><div class="hl">${ic("flame", 15, {fill:true})}<span>${esc(hotWhy(h))}</span></div><div class="hl sub">${ic("chart-bar", 15)}<span>${esc(hotNow(h))}${hints.length ? `；${esc(hints.join("；"))}` : ""}</span></div></div>`;
 }
 function hotNoteHtml(){
   const r = HOT_RULES; if (!r) return "";
-  return `<div class="hotnote"><b>怎么算流量爆帖：</b>发出 24 小时内浏览过 ${fmtW(r.zh.day)}（英文帖 ${fmtW(r.en.day)}），或 72 小时内过 ${fmtW(r.zh.threeDays)}（英文帖 ${fmtW(r.en.threeDays)}），或 7 天内破 ${fmtW(r.week)}，或发出 ${r.revival.minAgeHours / 24} 天以上的老帖一天内又涨 ${fmtPct(r.revival.pct)} 以上、至少多 ${fmtW(r.revival.min)}。数字每天随同步更新三次，最近火的排在最上面。</div>`;
+  return `<div class="hotnote"><b>怎么算流量爆帖：</b>发出 24 小时内浏览过 ${fmtW(r.zh.day)}（英文帖 ${fmtW(r.en.day)}），或 72 小时内过 ${fmtW(r.zh.threeDays)}（英文帖 ${fmtW(r.en.threeDays)}），或 7 天内破 ${fmtW(r.week)}，或发出 ${r.revival.minAgeHours / 24} 天以上的老帖一天内又涨 ${fmtPct(r.revival.pct)} 以上、至少多 ${fmtW(r.revival.min)}。插件每 30 分钟重看一次最近 100 条收藏的数字（要这台电脑的 Chrome 开着），最近火的排在最上面。</div>`;
 }
 // 可做成视频：快到期的在最上面，「随时能做」和没定档的排在后面（按最近收藏）；「过期了」里最近过期的在最上面
 function makeOrder(a, b){
@@ -333,7 +335,8 @@ function renderFeed(){
 function renderRight(){
   $("#videos").innerHTML = VIDEOS.map(([x, icon]) => { const n = ITEMS.filter((it) => live(it) && cls(it)?.video.includes(x)).length, on = st.videos.has(x);
     return `<div class="row"><span class="ci">${ic(icon, 20)}</span><span class="t"><b>${x}</b><span class="sub">${n} 条收藏可以做</span></span><button class="pill ${on ? "line" : "dark"}" data-video="${x}">${on ? `<span class="a">已筛选</span><span class="b">取消</span>` : "只看这类"}</button></div>`; }).join("");
-  const rows = [["today","今天 · 进来",ITEMS.filter(isToday).length],["make","快到期 · 一天内要做",dueSoonCount()],["nonote","待处理 · 没写备注",ITEMS.filter((it) => !noteOf(it).trim()).length],["pending","待处理 · 未分类",pendingCount()]];
+  $("#videos").closest(".box").hidden = !SHOW_MAKE;
+  const rows = [["today","今天 · 进来",ITEMS.filter(isToday).length],...(SHOW_MAKE ? [["make","快到期 · 一天内要做",dueSoonCount()]] : []),["nonote","待处理 · 没写备注",ITEMS.filter((it) => !noteOf(it).trim()).length],["pending","待处理 · 未分类",pendingCount()]];
   $("#today").innerHTML = rows.map(([k, s, n]) => `<button class="row" data-nav="v:${k}"><span class="t"><small>${s}</small><b>${n} 条收藏</b></span></button>`).join("");
   const freq = {}; for (const it of ITEMS) if (live(it)) for (const k of (cls(it)?.keywords || [])) freq[k] = (freq[k] || 0) + 1;
   $("#kws").innerHTML = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `<button class="row" data-kw="${esc(k)}"><span class="t"><small>关键词 · ${n} 条收藏</small><b>${esc(k)}</b></span></button>`).join("");
@@ -381,7 +384,7 @@ function sideOpen(id, kind){
     if (kind === "delay") side.delayTo = side.delayDrafts[id] || (w?.hours ? w.key : "3d");
   } else {
     $("#sideTitle").textContent = "哪里判断得不准";
-    $("#sideRef").innerHTML = `AI 分类到 <b>${esc(c?.tags.map(([, b]) => b).join("、") || "没分进标签")}</b>${c?.video.length ? ` · 可做成${c.video.map(esc).join("、")}` : ""}${c?.doWithin ? ` · ${esc(DOW.find((w) => w.key === c.doWithin)?.label || "")}` : ""}`;
+    $("#sideRef").innerHTML = `AI 分类到 <b>${esc(c?.tags.map(([, b]) => b).join("、") || "没分进标签")}</b>${SHOW_MAKE && c?.video.length ? ` · 可做成${c.video.map(esc).join("、")}` : ""}${SHOW_MAKE && c?.doWithin ? ` · ${esc(DOW.find((w) => w.key === c.doWithin)?.label || "")}` : ""}`;
     t.placeholder = "比如：这条我存它是因为讲法好，应该是口播参考"; t.value = side.drafts[kind + id] ?? reviewOf(id).fix ?? "";
   }
   side.id = id; side.kind = kind; $("#sideMsg").textContent = ""; $("#sideOpts").hidden = kind !== "delay";
@@ -461,15 +464,15 @@ function openMenu(anchor, html, key, extra){
 }
 const statusMenu = (id) => { const it = ITEMS.find((x) => x.id === id), cur = statusOf(it), w = tierOf(it);
   return STATUSES.map(([s, icon, d]) => `<button class="${s === cur ? "cur" : ""}" data-act="status" data-s="${s}" data-id="${id}">${ic(icon, 18.75, {fill: s === cur})}<span>${s}<small>${d}</small></span></button>`).join("") +
-    (cls(it) ? `<div class="sep"></div><button data-act="within" data-id="${id}">${ic("clock", 18.75)}<span>多久内做<small>${w ? `现在是「${esc(w.label)}」${reviewOf(id).doWithin ? "，你改的" : "，AI 定的"}` : "还没定：定了就会出现在「可做成视频」里"}</small></span></button>` : "") +
-    `<button data-act="edit" data-id="${id}">${ic("tags", 18.75)}<span>改分类<small>标签和可做成什么，改了马上生效，AI 以后也照着学</small></span></button>` +
-    (cls(it) && makeable(it) ? decideRows(id) : "") +
+    (SHOW_MAKE && cls(it) ? `<div class="sep"></div><button data-act="within" data-id="${id}">${ic("clock", 18.75)}<span>多久内做<small>${w ? `现在是「${esc(w.label)}」${reviewOf(id).doWithin ? "，你改的" : "，AI 定的"}` : "还没定：定了就会出现在「可做成视频」里"}</small></span></button>` : "") +
+    `<button data-act="edit" data-id="${id}">${ic("tags", 18.75)}<span>改分类<small>${SHOW_MAKE ? "标签和可做成什么" : "标签"}，改了马上生效，AI 以后也照着学</small></span></button>` +
+    (SHOW_MAKE && cls(it) && makeable(it) ? decideRows(id) : "") +
     `<div class="sep"></div><button data-act="open" data-id="${id}">${ic("external-link", 18.75)}<span>打开原帖</span></button><button data-act="copy" data-id="${id}">${ic("link", 18.75)}<span>复制链接</span></button>`; };
 // 改分类：可做成什么、标签，点一下就改，菜单不收起，接着点别的
 const editMenu = (id) => { const it = ITEMS.find((x) => x.id === id), c = cls(it) || { tags: [], video: [] }, L = reviewOf(id);
   const on = new Set(c.tags.map(([, b]) => b)), vids = new Set(c.video || []);
   const row = (act, attr, name, isOn, tip) => `<button class="${isOn ? "cur" : ""}" data-act="${act}" ${attr} data-id="${id}"${tip ? ` title="${esc(tip)}"` : ""}>${ic(isOn ? "circle-check" : "circle-plus", 18.75, {fill: isOn})}<span>${esc(name)}</span></button>`;
-  return `<div class="mh">可做成视频${L.video ? " · 你改过" : ""}</div>` + VIDEOS.map(([x]) => row("edit-video", `data-v="${x}"`, x, vids.has(x))).join("") +
+  return (SHOW_MAKE ? `<div class="mh">可做成视频${L.video ? " · 你改过" : ""}</div>` + VIDEOS.map(([x]) => row("edit-video", `data-v="${x}"`, x, vids.has(x))).join("") : "") +
     TAXO.map((g) => `<div class="sep"></div><div class="mh">${esc(g.major)}${L.tags ? "" : ""}</div>` + g.minors.map((m) => row("edit-tag", `data-m="${esc(m.name)}"`, m.name, on.has(m.name), m.why)).join("")).join("") +
     (L.tags || L.video ? `<div class="sep"></div><button data-act="edit-reset" data-id="${id}">${ic("sparkles", 18.75)}<span>改回按 AI 分的</span></button>` : ""); };
 function editPatch(id, patch, msg){
@@ -649,31 +652,46 @@ function viewName(){ const v = st.view; if (v.kind === "tag") return v.minor ? `
 function diyPrompt(){
   const version = chrome.runtime.getManifest().version;
   return [
-    `我在用 Chrome 插件「X 收藏备注」（${version} 版）的收藏页，想按自己的需要改一改这个页面。你来帮我改，但先别动手，按下面三步来。`,
+    `我在用 Chrome 插件「X 收藏备注」（${version} 版）的收藏页。它现在的分类和左栏是照插件作者自己的用法设计的：作者是做 AI 内容的博主，所以有「做内容参考」「可做成视频」「流量爆帖」这些。我想把它改成适合我自己的样子。你来帮我改，但先别动手，按下面四步来。`,
     "",
-    "第一步：问清楚我要什么。",
-    "1. 先问我想改什么。一次只问一到三个问题，每个问题给两三个常见的选项让我挑，每个选项写清选了会怎样，我用自己的话回答就行，也可以说别的；我答完再接着问，直到你能说清楚四件事：改哪一块（左栏、卡片、右栏、搜索、分类……）、改成什么样（让我举个例子，或者说像哪个网站、哪个地方）、改了用来干什么、哪些地方保持原样。",
-    "2. 我说不清楚的时候，你把两三种改法分别会是什么样子讲给我听，让我挑。跟我说话不用技术词。",
-    "3. 问清楚以后，用几句大白话复述你打算怎么改、改完我会看到什么，等我说「可以」再动手。",
+    "第一步：先弄清我是谁、收藏来干什么。",
+    "1. 先问我三件事，一次问完。每件给几个常见的选项让我挑，可以多选，也可以用自己的话说：",
+    "   - 我是做什么的（比如程序员、产品经理、内容创作者或 AI 博主、创业或做生意、学生或做研究）；",
+    "   - 我在 X 上收藏的大多是什么（比如 AI 工具和开源项目、编程技术、AI 用法和工作流、行业新闻、商业和赚钱、做内容的方法）；",
+    "   - 收藏下来要拿来干什么（比如学会了用进自己的工作流、找做产品的灵感、找选题和素材、跟上行业动向、以后遇到事能查到）。",
+    "2. 第三件「拿来干什么」最要紧：分类是按「我以后什么时候会回来翻它」来分的，不知道用途就分不好。我答得再模糊、只说了一个方向也行；要是这一件我完全没答，换个说法再问我一次，给我选项挑。",
+    "3. 接着问我：现在的分类和左栏里，哪些我用不上、哪些不顺手、缺什么。我说不知道也行。",
     "",
-    "第二步：改。",
+    "第二步：让我选，要不要你先看看我最近的收藏。",
+    "1. 问我选哪个：看最近 7 天的收藏、看最近 30 天的收藏、不用看，就按我说的来。我第一步答得越细，越可以不看；答得含糊，你就建议我选看一看。",
+    "2. 收藏在哪：插件把每条收藏存成一个 Markdown 文件，默认在「下载」文件夹里的「X收藏」文件夹（Chrome 改过下载位置，就在改过的地方；找不到就在用户目录下搜「_索引.md」这个文件）。「_索引.md」是总表，一行一条：收藏时间、作者、我为什么收藏、讲什么。每条的文件在「收藏/年-月/」里，文件名开头是收藏日期。",
+    "3. 只读我选的那段时间。每条先看「我为什么收藏」那一段，那是我收藏时自己写的，最能说明我拿它干什么；再看「原文」；文件末尾的「AI 整理」是按现在的分类分的，能看出现在的分类哪里不合我用。这些文件只读不改。",
+    "4. 读完用几句话告诉我：这段时间我主要收藏了哪几类东西、各大概多少条，我写的「为什么收藏」里反复出现的用途是什么。",
+    "",
+    "第三步：给我一套分类建议，等我同意。",
+    "1. 按「我以后什么时候会回来翻它」来分：3 到 5 个大类，每个大类写一句什么时候翻它；每个大类下面 2 到 4 个小类，每个小类写一句放什么。照「如无必要，勿增实体」：我用不上的类不留，两个类分不清就合成一个，每个类都要说得出我最近哪几条会放进去，说不出来的不要。",
+    "2. 左栏里跟我没关系的栏目，建议藏起来（比如不做内容的人用不上「可做成视频」「流量爆帖」）；我会用的留着。",
+    "3. 给我看建议时，从我最近的收藏里挑几条，举例放进各个类，让我一眼看出分得对不对。跟我说话用大白话，不用技术词。",
+    "4. 等我说「可以」再动手；我说哪里不对，你就改建议，再给我看。我想改的要是不止分类（比如卡片的样子、搜索、颜色），一样先问清楚：改哪一块、改成什么样（让我举个例子，或者说像哪个网站）、改了用来干什么、哪些地方保持原样。一次只问一到三个问题，问清楚以后用几句话复述，等我说「可以」再动手。",
+    "",
+    "第四步：改，再让我看效果。",
     "1. 先找到插件文件夹：里面有 manifest.json，它的 name 是「X 收藏备注」，常放在「文稿」「下载」「桌面」里；找不到就在用户目录下搜 shoucang.html。",
     "2. 动手前把整个 extension 文件夹复制一份当备份，放在它旁边，文件夹名后面加上今天的日期。",
-    "3. 文件分工：收藏页的布局和样式在 extension/shoucang.html；页面怎么画、每个按钮做什么在 extension/shoucang.js；页面要的数据由 extension/background.js 里的 pageApi、shoucangData 给；分类树和给 AI 的分类说明在 extension/lib/classify.js（改了分类树，已经分好的收藏会自动按新分类重分）；收藏时弹出的备注框在 extension/card.html、extension/card.js。",
-    "4. 不能动的：manifest.json 里的 key（改了插件编号会变，AI 分类就连不上了）；插件存数据的方式和已有数据的格式（chrome.storage 里 t:、n:、i:、r: 开头的那些），不然我已经存的收藏和备注会读不出来；「我为什么收藏」的备注只能由我自己写。",
+    "3. 改分类在 extension/lib/classify.js：ABOUT_ME 是一句话说我是什么人、收藏来干什么，AI 分类时先读它；TAXONOMY 是分类树（major 是大类，when 是什么时候翻它，minors 里 name 是小类、why 是放什么）。把这两处换成我们定下的。同一个文件里 classifierInstructions 有几条「分不清时这样判断」，是照原来的分类写的，按新分类改写，用不上的删掉。",
+    "4. 左栏的栏目在 extension/shoucang.js 的 VIEWS（全部收藏、今天、可做成视频、流量爆帖、没写备注、未分类），不要的从这里删掉（删了「可做成视频」「流量爆帖」，卡片和右栏上跟它们有关的字会自己跟着不显示）；大类的图标在同一个文件的 MAJOR_IC，新大类各配一个。「可做成视频」「多久内做」在 classify.js 里的那几问和输出格式不要删，只把栏目藏起来就行，删了分类会出错。",
+    "5. 我的 AI 用来查收藏的 Skill 里有一份分类表，在 x-bookmark-notes 这个 Skill 文件夹的 references/categories.md（Claude Code 一般在 ~/.claude/skills/，Codex 一般在 ~/.codex/skills/，哪里有就改哪里），插件文件夹里 extension/skill/ 下的那份也一起照新分类改掉。写不进去就请我点允许，别跳过。",
+    "6. 别的文件分工：收藏页的布局和样式在 extension/shoucang.html；页面怎么画、每个按钮做什么在 extension/shoucang.js；页面要的数据由 extension/background.js 里的 pageApi、shoucangData 给；收藏时弹出的备注框在 extension/card.html、extension/card.js。",
+    "7. 不能动的：manifest.json 里的 key（改了插件编号会变，AI 分类就连不上了）；插件存数据的方式和已有数据的格式（chrome.storage 里 t:、n:、i:、r:、m: 开头的那些），不然我已经存的收藏和备注会读不出来；「我为什么收藏」的备注只能由我自己写。",
+    "8. 改完提醒我：打开 chrome://extensions，在「X 收藏备注」卡片上点刷新图标，再刷新收藏页。这一步我自己来点。改了分类的话，告诉我插件会自己用我电脑上的 Codex 或 Claude Code 把已有的收藏按新分类重分一遍，用的是我自己账号的额度，一次分 80 条，多的过一会儿接着分，收藏页上能看到卡片一条条变过来。",
+    "9. 我看了说不对，就接着改，直到我满意。插件文件夹里有 test/e2e.mjs 的话，改完运行 node test/e2e.mjs，有没过的告诉我是哪一项、要不要紧（改了分类，测试里检查原来分类名字的那几项没过是正常的）。",
+    "10. 最后在 extension 文件夹旁边写一份「我的改动.md」：我是什么人、收藏来干什么，改了什么、为什么改、改了哪些文件。以后插件出新版、整个文件夹换成新的时，我把这份文件和新版一起发给你，你照着再改一遍。",
     "",
-    "第三步：让我看效果。",
-    "1. 改完提醒我：打开 chrome://extensions，在「X 收藏备注」卡片上点刷新图标，再刷新收藏页。这一步我自己来点。",
-    "2. 我看了说不对，就接着改，直到我满意。",
-    "3. 插件文件夹里有 test/e2e.mjs 的话，改完运行 node test/e2e.mjs，有没过的告诉我是哪一项、要不要紧。",
-    "4. 最后在 extension 文件夹旁边写一份「我的改动.md」：改了什么、为什么改、改了哪些文件。以后插件出新版、整个文件夹换成新的时，我把这份文件和新版一起发给你，你照着再改一遍。",
-    "",
-    `我点 DIY 的时候，收藏页正在看「${viewName()}」这一栏。我想改的写在这句话后面（没写就从第一步开始问我）：`,
+    `我点 DIY 的时候，收藏页正在看「${viewName()}」这一栏。我已经想好要改的写在这句话后面（没写就从第一步开始问我）：`,
     "",
   ].join("\n");
 }
 async function copyDiy(){
-  try { await navigator.clipboard.writeText(diyPrompt()); toast("复制好了：发给你的 Codex 或 Claude Code，它会先问你想怎么改"); }
+  try { await navigator.clipboard.writeText(diyPrompt()); toast("复制好了：发给你的 Codex 或 Claude Code，它会先问你是做什么的、收藏来干什么"); }
   catch { toast("没复制上，再点一次 DIY"); }
 }
 async function saveReview(id, patch, done){
@@ -778,6 +796,10 @@ st.view = viewFromHash() || st.view;
 window.addEventListener("hashchange", () => { const v = viewFromHash(); if (v){ st.view = v; closeMenu(); render({top:true}); } });
 load({ first: true }).catch((error) => { $("#feed").innerHTML = `<div class="empty"><b>读不到收藏</b><span>${esc(error.message)}。${ON_MAC ? "刷新一下这个页面；还不行，到 chrome://extensions 点插件卡片上的刷新图标" : "等 Mac 醒着、联网时，过一分钟再刷新。"}</span></div>`; });
 let lastLoad = Date.now();
+// 一打开收藏页、切回收藏页：好一阵没同步了，插件就自己去 X 抓一次，抓到的会自己出现在页面上
+const syncIfStale = () => api("/api/bookmark-notes/sync", { ifStale: true }).catch(() => {});
+syncIfStale();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncIfStale(); });
 document.addEventListener("visibilitychange", pickVideo); // 切到别的标签页就停，切回来接着播
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible" || Date.now() - lastLoad < 20000 || side.id) return;
@@ -785,6 +807,6 @@ document.addEventListener("visibilitychange", () => {
 });
 let storageTimer = 0;
 chrome.storage.onChanged.addListener((changes) => {
-  if (!Object.keys(changes).some((k) => /^(t|n|i|r):/.test(k) || k === "classifyRun")) return;
+  if (!Object.keys(changes).some((k) => /^(t|n|i|r|m):/.test(k) || k === "classifyRun")) return;
   clearTimeout(storageTimer); storageTimer = setTimeout(() => { if (document.visibilityState === "visible" && !side.id) { lastLoad = Date.now(); load().catch(() => {}); } }, 1200);
 });
